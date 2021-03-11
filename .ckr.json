@@ -1,0 +1,17 @@
+{
+  "data_uoa": "ck-compiler-gym",
+  "data_uid": "2f34da48aaacf886",
+  "data_alias": "ck-compiler-gym",
+  "data_name": "ck-compiler-gym",
+  "dict": {
+    "shared": "git",
+    "url": "https://github.com/phesse001/ck-compiler-gym",
+    "allow_writing": "yes",
+    "repo_deps": [
+      {
+        "repo_uoa": "ck-autotuning",
+        "repo_uoa": "ctuning-programs"
+      }
+    ]
+  }
+}
