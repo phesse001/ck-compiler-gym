@@ -1,0 +1,57 @@
+{
+  "backup_data_uid": "9b5abebf4aae81ac",
+  "build_compiler_vars": {},
+  "compile_deps": {
+    "python": {
+    "local": "yes",
+    "name": "Python interpreter",
+    "tags": "compiler,python"
+    },
+    "lib-python-compiler-gym": {
+      "local": "yes",
+      "name": "compiler gym",
+      "tags": "compiler_gym,lib,python-package"
+    },
+    "compiler-llvm-10.0.0-universal": {
+    "local": "yes",
+    "name": "llvm",
+    "tags": "llvm,v10,compiler"
+    }
+  },
+  "data_name": "template-hello-world-c",
+  "main_language": "c",
+  "print_files_after_run": [
+    "stderr.log",
+    "stdout.log"
+  ],
+  "process_in_tmp": "yes",
+  "program": "yes",
+  "run_cmds": {
+    "default": {
+      "ignore_return_code": "no",
+      "run_time": {
+        "run_cmd_main": "$#BIN_FILE#$ \"$#src_path#$\"",
+        "run_cmd_out1": "stdout.log",
+        "run_cmd_out2": "stderr.log",
+        "run_output_files": [
+          "stdout.log",
+          "stderr.log"
+        ]
+      }
+    }
+  },
+  "run_vars": {
+    "GYM_ENV": "llvm-autophase-ic-v0"
+  },
+  "source_files": [
+    "hello-world.c"
+  ],
+  "tags": [
+    "template",
+    "program",
+    "lang-c"
+  ],
+  "target_file": "a",
+  "template": "yes",
+  "template_type": "C program workflow"
+}
