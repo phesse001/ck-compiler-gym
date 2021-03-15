@@ -12,29 +12,31 @@ work = {}  # Will be updated by CK (temporal data)
 ck = None  # Will be updated by CK (initialized CK kernel)
 
 # Local settings
+import os
 
 ##############################################################################
 # Initialize module
 
 
 def init(i):
-    """
 
-    Input:  {}
+	"""
 
-    Output: {
-              return       - return code =  0, if successful
+	Input:  {}
+
+	Output: {
+			return       - return code =  0, if successful
                                          >  0, if error
-              (error)      - error text if return > 0
-            }
+			(error)      - error text if return > 0
+			}
 
-    """
-    return {'return': 0}
+	"""
+	return {'return': 0}
 
 ##############################################################################
 # compiles a given program to bitcode
 
-def compile_to_bitcode(i):
+def compile_and_run_bitcode(i):
     """
     Input:  {
             }
@@ -46,11 +48,10 @@ def compile_to_bitcode(i):
             }
 
     """
-    import os
+
+    import subprocess
     import compiler_gym
     import gym
-
-    # TODO - detect compile deps and run corresponding env.sh files 
 
     ck.out('Compiles a given program to bitcode')
 
@@ -72,9 +73,10 @@ def compile_to_bitcode(i):
     d = {'module_uoa': muoa,
          'data_uoa': duoa
         }
+
     r = ck.load(d)
     if r['return']>0: return r
-    path = r['path']
+    program_path = r['path']
     program_meta = r['dict']
 
     env_str = program_meta['run_vars']['GYM_ENV']
@@ -82,12 +84,25 @@ def compile_to_bitcode(i):
     env = gym.make(env_str)
 
     program_files = program_meta['source_files']
-    env.benchmark = env.make_benchmark(path + dir_sep + program_files[0])
+    env.benchmark = env.make_benchmark(program_path + dir_sep + program_files[0])
     # init env - do normal env stuff and then measure runtime
     observation = env.reset()
     # write the current program state to a bitcode file
-    env.write_bitcode(path + dir_sep + "hello_world.bc")
+    bc_file = program_meta['run_cmds']['default']['run_time']['run_cmd_out']
+    bc_path = program_path + dir_sep + bc_file
+
+    env.write_bitcode(bc_path)
     # TODO - look at program module to see how they use run_cmd_main from meta to run prgram, do same using clang-10 for bc file
+    run_cmd = program_meta['run_cmds']['default']['run_time']['run_cmd_main']
+    time_cmd = program_meta['run_cmds']['default']['run_time']['time_cmd_main']
+
+    os.chdir(program_path)
+    # compile to executable
+    subprocess.check_output([run_cmd, bc_file])
+
+    # time executable - TODO - figure out how to record time output
+    time = subprocess.check_output([time_cmd, './a.out'])
+    
     env.close()
 
     return {'return':0}
@@ -96,27 +111,45 @@ def compile_to_bitcode(i):
 # run bitcode
 
 def run(i):
-    """
-    Input:  {
-            }
 
-    Output: {
-              return       - return code =  0, if successful
-                                         >  0, if error
-              (error)      - error text if return > 0
-            }
+	tag_grps = ''
 
-    """
+	d = {'module_uoa': 'platform.os',
+         'action': 'detect'
+        }
 
-    ck.out('run bitcode')
+	r = ck.access(d)
+	if r['return']>0: return r
+	os_dict = r['os_dict']
+	dir_sep = os_dict['dir_sep']
 
-    ck.out('')
-    ck.out('Command line: ')
-    ck.out('')
+	duoa = i['data_uoa']
+	muoa = i['module_uoa']
 
-    import json
-    cmd=json.dumps(i, indent=2)
+	# load the entry's dictionary
+	d = {'module_uoa': muoa,
+         'data_uoa': duoa
+		}
+	r = ck.load(d)
+	if r['return']>0: return r
 
-    ck.out(cmd)
+	program_path = r['path']
+	program_meta = r['dict']
 
-    return {'return':0}
+	# source env vars for deps... might be better ways to do this via ck api
+	deps = program_meta['compile_deps']
+	for dep,value in deps.items():
+		tags = value['tags']
+		# create a string of tag groups
+		tag_grps += tags + ' '
+
+	d = {'module_uoa':'env',
+		 'action': 'virtual',
+		 'tag_groups': tag_grps,
+		 'shell_cmd': 'ck compile_and_run_bitcode cg-program:template-hello-world-c'
+		}
+
+	r = ck.access(d)
+	if r['return']>0: return r
+
+	return {'return':0}

@@ -1,7 +1,7 @@
 {
   "actions": {
-    "compile_to_bitcode": {
-      "desc": "compiles a given program to bitcode"
+    "compile_and_run_bitcode": {
+      "desc": "compile and run a given program to bitcode"
     },
     "run": {
       "desc": "run bitcode"

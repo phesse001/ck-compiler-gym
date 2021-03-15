@@ -1,5 +1,6 @@
 {
   "backup_data_uid": "9b5abebf4aae81ac",
+  "data_name": "template-hello-world-c",
   "build_compiler_vars": {},
   "compile_deps": {
     "python": {
@@ -18,25 +19,16 @@
     "tags": "llvm,v10,compiler"
     }
   },
-  "data_name": "template-hello-world-c",
   "main_language": "c",
-  "print_files_after_run": [
-    "stderr.log",
-    "stdout.log"
-  ],
   "process_in_tmp": "yes",
   "program": "yes",
   "run_cmds": {
     "default": {
       "ignore_return_code": "no",
       "run_time": {
-        "run_cmd_main": "$#BIN_FILE#$ \"$#src_path#$\"",
-        "run_cmd_out1": "stdout.log",
-        "run_cmd_out2": "stderr.log",
-        "run_output_files": [
-          "stdout.log",
-          "stderr.log"
-        ]
+        "run_cmd_main": "clang-10",
+        "time_cmd_main": "time",
+        "run_cmd_out": "hw.bc"
       }
     }
   },
