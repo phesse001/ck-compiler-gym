@@ -59,12 +59,11 @@ def compile_and_run_bitcode(i):
     d = {'module_uoa': 'platform.os',
          'action': 'detect'
         }
-
     r = ck.access(d)
     if r['return']>0: return r
+
     os_dict = r['os_dict']
     dir_sep = os_dict['dir_sep']
-
 
     duoa = i['data_uoa']
     muoa = i['module_uoa']
@@ -73,9 +72,9 @@ def compile_and_run_bitcode(i):
     d = {'module_uoa': muoa,
          'data_uoa': duoa
         }
-
     r = ck.load(d)
     if r['return']>0: return r
+
     program_path = r['path']
     program_meta = r['dict']
 
@@ -92,16 +91,16 @@ def compile_and_run_bitcode(i):
     bc_path = program_path + dir_sep + bc_file
 
     env.write_bitcode(bc_path)
-    # TODO - look at program module to see how they use run_cmd_main from meta to run prgram, do same using clang-10 for bc file
+
     run_cmd = program_meta['run_cmds']['default']['run_time']['run_cmd_main']
-    time_cmd = program_meta['run_cmds']['default']['run_time']['time_cmd_main']
 
     os.chdir(program_path)
-    # compile to executable
-    subprocess.check_output([run_cmd, bc_file])
+    # compile to executable - TODO - use ck host + target os to eliminate cross-compile warning
+    os.system(run_cmd + " " + bc_file)
+    #subprocess.check_output([run_cmd, bc_file])
 
-    # time executable - TODO - figure out how to record time output
-    time = subprocess.check_output([time_cmd, './a.out'])
+    # time executable
+    os.system('{ time ./a.out ; } 2> time.txt')
     
     env.close()
 
@@ -125,6 +124,7 @@ def run(i):
 
 	duoa = i['data_uoa']
 	muoa = i['module_uoa']
+	print(duoa)
 
 	# load the entry's dictionary
 	d = {'module_uoa': muoa,
@@ -136,7 +136,7 @@ def run(i):
 	program_path = r['path']
 	program_meta = r['dict']
 
-	# source env vars for deps... might be better ways to do this via ck api
+	# source env vars for deps... might be better ways to do this
 	deps = program_meta['compile_deps']
 	for dep,value in deps.items():
 		tags = value['tags']
@@ -146,7 +146,7 @@ def run(i):
 	d = {'module_uoa':'env',
 		 'action': 'virtual',
 		 'tag_groups': tag_grps,
-		 'shell_cmd': 'ck compile_and_run_bitcode cg-program:template-hello-world-c'
+		 'shell_cmd': 'ck compile_and_run_bitcode ' + muoa + ':' + duoa
 		}
 
 	r = ck.access(d)
