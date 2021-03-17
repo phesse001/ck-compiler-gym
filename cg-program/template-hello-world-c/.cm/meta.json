@@ -26,7 +26,7 @@
     "default": {
       "ignore_return_code": "no",
       "run_time": {
-        "run_cmd_main": "$CK_CC",
+        "run_cmd_main": "clang-10",
         "time_cmd_main": "time",
         "run_cmd_out": "hw.bc"
       }

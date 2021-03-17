@@ -1,11 +1,15 @@
 {
   "actions": {
-    "compile_and_run_bitcode": {
+    "run_dqn": {
       "desc": "compile and run a given program to bitcode"
+    },
+    "make_dataset": {
+      "desc": "creates a dataset of c programs to use within llvm compiler gym env"
     },
     "run": {
       "desc": "run bitcode"
     }
   },
+  "actions_redirect": {},
   "desc": "actions to use with compiler gym"
 }
