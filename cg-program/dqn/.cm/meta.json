@@ -17,6 +17,11 @@
     "local": "yes",
     "name": "llvm",
     "tags": "llvm,v10,compiler"
+    },
+    "lib-python-torch": {
+    "local": "yes",
+    "name": "torch",
+    "tags": "torch,v1.8"
     }
   },
   "main_language": "c",

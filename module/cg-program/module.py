@@ -20,18 +20,13 @@ import os
 
 def init(i):
 
-	"""
+    import sys 
 
-	Input:  {}
+    path = i['path']
 
-	Output: {
-			return       - return code =  0, if successful
-                                         >  0, if error
-			(error)      - error text if return > 0
-			}
+    sys.path.insert(1, path)
 
-	"""
-	return {'return': 0}
+    return {'return': 0}
 
 ##############################################################################
 # compiles a given program to bitcode
@@ -52,6 +47,8 @@ def run_dqn(i):
     import subprocess
     import compiler_gym
     import gym
+    import time
+    import numpy as np
     from dqn import Agent
 
     # detect platform for various info
@@ -59,6 +56,7 @@ def run_dqn(i):
          'action': 'detect'
         }
     r = ck.access(d)
+
     if r['return']>0: return r
 
     os_dict = r['os_dict']
@@ -79,13 +77,75 @@ def run_dqn(i):
 
     program_files = program_meta['source_files']
 
-    for program in program_files:
-        program = porgram_path + dir_sep + program
+    for num in range(len(program_files)):
+        program_files[num] = program_path + dir_sep + program_files[num]
 
     env_str = program_meta['run_vars']['GYM_ENV']
     # create gym environment
     env = gym.make(env_str)
-    env.benchmark = env.make_benchmark(program_files)
+    #create benchmark of programs specified with --dataset_tags
+    dataset_tags = i['dataset_tags']
+
+    # search for all program entries with specified tags
+    d = {'module_uoa': 'program',
+         'action': 'search',
+         'tags': dataset_tags
+        }
+
+    r = ck.access(d)
+    if r['return']>0: return r
+
+    # programs is a list of dictionaries containing information about programs matching specified tag
+    programs = r['lst']
+
+    # check to make sure program compilation is successful before running
+    for program in programs:
+
+        program_duoa = program['data_uoa']
+
+        d = {'module_uoa':'program',
+             'action': 'compile',
+             'data_uoa': program_duoa
+            }
+
+        r = ck.access(d)
+        if r['return']>0:
+
+            programs.remove(program)  
+
+    benchmarks = []
+
+    for program in programs:
+        
+        program_duoa = program['data_uoa']
+
+
+        d = {'module_uoa':'program',
+             'action': 'load',
+             'data_uoa': program_duoa
+            }
+
+        r = ck.access(d)
+        if r['return']>0: return r
+
+        path = r['path']
+        files = r['dict']['source_files']
+        for num in range(len(files)):
+            files[num] = path + dir_sep + files[num]
+        # go through and add path to the start of all the files
+        # print(files)
+        # makes a benchmark with each list of files
+        benchmark = env.make_benchmark(files)
+        benchmarks.append(benchmark)
+
+    # TODO - find out how to make benchmarks (might be able to just load each meta and pass the
+    # source files as args to benchmark, could also try to directly compile to bitcode, or might
+    # have to provide information (ask in gh issue about make_benchmark api if it doesn't work))
+
+
+
+    #env.benchmark = env.make_benchmark(program_files)
+    env.benchmarks = benchmarks
 
     agent = Agent(gamma = 0.99, epsilon = 1.0, batch_size = 32,
             n_actions = env.action_space.n, eps_end = 0.05, input_dims = [56], alpha = 0.005)
@@ -95,6 +155,10 @@ def run_dqn(i):
     bc_path = program_path + dir_sep + bc_file
     run_cmd = program_meta['run_cmds']['default']['run_time']['run_cmd_main']
     os.chdir(program_path)
+
+    out = program_meta['target_file']
+    ep = os_dict['exec_prefix']
+    ext = os_dict['file_extensions']['exe']
 
     tmp = 0
     for i in range(1,10001):
@@ -109,15 +173,18 @@ def run_dqn(i):
         iterations = []
         avg_total = []
         change_count = 0
-        time_old = 0
+
         #write current observation to bitcode file
         env.write_bitcode(bc_path)
         #compile run and time file bc in original state
-        os.system(run_cmd + " " + bc_path)
+        os.system(run_cmd + " -Wno-override-module " + bc_path + " -o " + out)
         # time executable
-        os.system('(time ./a.out) &> time.log')
+        start = time.time()
+        os.system(ep + out + ext)
         # read time from file into var
-        # runtime = usr + sys time from file
+        end = time.time()
+        
+        runtime = end - start
 
         while done == False and actions_taken < 100 and change_count < 10:
             #only apply finite number of actions to given program
@@ -128,19 +195,21 @@ def run_dqn(i):
             #write current observation to bitcode file
             env.write_bitcode(bc_path)
             #compile run and time file to use runtime as reward signal
-            os.system(run_cmd + " " + bc_path)
+            os.system(run_cmd + " -Wno-override-module " + bc_path + " -o " + out)
             # time executable
-            os.system('(time ./a.out) &> time.log')
+            start = time.time()
+            os.system(ep + out + ext)
+            end = time.time()
             # TODO - read time from file store into var and compute reward as follows
             # read time from file into var
 
-            # nruntime = usr + sys time from file
-            # reward = ln(runtime/nruntime)
-            # runtime = nruntime
+            nruntime = end - start
+            reward = np.log(runtime/nruntime)
+            runtime = nruntime
 
             total += reward
             if reward == 0:
-            change_count += 1
+                change_count += 1
             else:
                 change_count = 0
 
@@ -163,47 +232,48 @@ def run_dqn(i):
 
 def run(i):
 
-	tag_grps = ''
+    tag_grps = ''
 
-	d = {'module_uoa': 'platform.os',
-         'action': 'detect'
+    d = {'module_uoa': 'platform.os',
+        'action': 'detect'
         }
 
-	r = ck.access(d)
-	if r['return']>0: return r
-	os_dict = r['os_dict']
-	dir_sep = os_dict['dir_sep']
+    r = ck.access(d)
+    if r['return']>0: return r
+    os_dict = r['os_dict']
+    dir_sep = os_dict['dir_sep']
 
-	duoa = i['data_uoa']
-	muoa = i['module_uoa']
+    duoa = i['data_uoa']
+    muoa = i['module_uoa']
+    dataset_tags = i['dataset_tags']
 
 	# load the entry's dictionary
-	d = {'module_uoa': muoa,
-         'data_uoa': duoa
-		}
-	r = ck.load(d)
-	if r['return']>0: return r
+    d = {'module_uoa': muoa,
+        'data_uoa': duoa
+        }
+    r = ck.load(d)
+    if r['return']>0: return r
 
-	program_path = r['path']
-	program_meta = r['dict']
+    program_path = r['path']
+    program_meta = r['dict']
 
 	# source env vars for deps... might be better ways to do this
-	deps = program_meta['compile_deps']
-	for dep,value in deps.items():
-		tags = value['tags']
-		# create a string of tag groups
-		tag_grps += tags + ' '
+    deps = program_meta['compile_deps']
+    for dep,value in deps.items():
+        tags = value['tags']
+        # create a string of tag groups
+        tag_grps += tags + ' '
 
-	d = {'module_uoa':'env',
+    d = {'module_uoa':'env',
 		 'action': 'virtual',
 		 'tag_groups': tag_grps,
-		 'shell_cmd': 'ck run_dqn ' + muoa + ':' + duoa
+		 'shell_cmd': 'ck run_dqn ' + muoa + ':' + duoa + ' --dataset_tags=' + dataset_tags
 		}
 
-	r = ck.access(d)
-	if r['return']>0: return r
+    r = ck.access(d)
+    if r['return']>0: return r
 
-	return {'return':0}
+    return {'return':0}
 
 ##############################################################################
 # creates a dataset of c programs to use within llvm compiler gym env
@@ -231,5 +301,9 @@ def make_dataset(i):
     cmd=json.dumps(i, indent=2)
 
     ck.out(cmd)
+
+    # TODO 
+    # provide repo uoa 
+    # 
 
     return {'return':0}
