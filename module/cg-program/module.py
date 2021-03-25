@@ -48,6 +48,8 @@ def run_dqn(i):
     import compiler_gym
     import gym
     import time
+    import random
+    import glob
     import numpy as np
     from dqn import Agent
 
@@ -97,6 +99,8 @@ def run_dqn(i):
 
     # programs is a list of dictionaries containing information about programs matching specified tag
     programs = r['lst']
+    # keep track of programs that don't compile
+    bad_programs = []
 
     # check to make sure program compilation is successful before running
     for program in programs:
@@ -105,13 +109,23 @@ def run_dqn(i):
 
         d = {'module_uoa':'program',
              'action': 'compile',
-             'data_uoa': program_duoa
+             'compiler_tags': "llvm",
+             'data_uoa': program_duoa,
+             'use_clang_opt':'yes'
             }
 
+        # compile program to bitcode in tmp dir
         r = ck.access(d)
-        if r['return']>0:
+        
+        # for some reason return seems to be 0 even when it fails, using other indicator for now
+        # if program compilation fails, remove it from the list of programs to use.
+        if r['misc']['compilation_success'] == 'no':
 
-            programs.remove(program)  
+            bad_programs.append(program)
+
+    # remove bad programs
+    for program in bad_programs:
+        programs.remove(program)
 
     benchmarks = []
 
@@ -119,51 +133,58 @@ def run_dqn(i):
         
         program_duoa = program['data_uoa']
 
-
         d = {'module_uoa':'program',
              'action': 'load',
              'data_uoa': program_duoa
             }
 
+        # loads programs meta desc
         r = ck.access(d)
         if r['return']>0: return r
 
+        meta = r['dict']
+        # find path to program entry
         path = r['path']
-        files = r['dict']['source_files']
+        #files = meta['source_files']
+        # find out whether entry compiles files to tmp directory
+        p_in_tmp = meta['process_in_tmp']
+        if p_in_tmp == 'yes':
+            path = path + dir_sep + 'tmp'
+
+        # list files in the specified directory and return list of all the bitcode files
+        files = [f for f in os.listdir(path) if '.bc' in f]
+
         for num in range(len(files)):
             files[num] = path + dir_sep + files[num]
         # go through and add path to the start of all the files
-        # print(files)
         # makes a benchmark with each list of files
         benchmark = env.make_benchmark(files)
-        benchmarks.append(benchmark)
+        # append tuple of benchmark and uid 
+        benchmarks.append((benchmark,meta['backup_data_uid']))
 
     # TODO - find out how to make benchmarks (might be able to just load each meta and pass the
     # source files as args to benchmark, could also try to directly compile to bitcode, or might
     # have to provide information (ask in gh issue about make_benchmark api if it doesn't work))
 
-
-
     #env.benchmark = env.make_benchmark(program_files)
-    env.benchmarks = benchmarks
+    # choose current benchmark randomly for right now
 
     agent = Agent(gamma = 0.99, epsilon = 1.0, batch_size = 32,
             n_actions = env.action_space.n, eps_end = 0.05, input_dims = [56], alpha = 0.005)
 
-
-    bc_file = program_meta['run_cmds']['default']['run_time']['run_cmd_out']
-    bc_path = program_path + dir_sep + bc_file
-    run_cmd = program_meta['run_cmds']['default']['run_time']['run_cmd_main']
-    os.chdir(program_path)
-
-    out = program_meta['target_file']
+    out = "a"
     ep = os_dict['exec_prefix']
     ext = os_dict['file_extensions']['exe']
 
+    actions = env.action_space.names
+
     tmp = 0
     for i in range(1,10001):
+        benchmark_tuple = random.choice(benchmarks)
+        current_benchmark = benchmark_tuple[0]
+        data_uoa = benchmark_tuple[1]
         #observation is the 56 dimensional static feature vector from autophase
-        observation = env.reset()
+        observation = env.reset(benchmark=current_benchmark)
         #maybe try setting done to true every time code size increases
         done = False
         total = 0
@@ -175,30 +196,57 @@ def run_dqn(i):
         change_count = 0
 
         #write current observation to bitcode file
-        env.write_bitcode(bc_path)
+        #env.write_bitcode(bitcode_path + dir_sep + "out.bc")
         #compile run and time file bc in original state
-        os.system(run_cmd + " -Wno-override-module " + bc_path + " -o " + out)
+
+
         # time executable
         start = time.time()
-        os.system(ep + out + ext)
+        d = {'module_uoa':'program',
+             'data_uoa': data_uoa,
+             'action': 'run'
+            }
+        r = ck.access(d)
+        if r['return'] > 0: return r
         # read time from file into var
         end = time.time()
         
         runtime = end - start
 
+        # TODO - find out which transformation was chosen (using lookup table from cg api),
+        # apply that transformation to the programs bitcode file, 
+
+        pass_list = ''
+
         while done == False and actions_taken < 100 and change_count < 10:
             #only apply finite number of actions to given program
             action = agent.choose_action(observation)
+            trans_pass = actions[action]
+            pass_list += trans_pass + ' '
             new_observation, reward, done, info = env.step(action)
             actions_taken += 1
-            #run again to see what diff is
-            #write current observation to bitcode file
-            env.write_bitcode(bc_path)
-            #compile run and time file to use runtime as reward signal
-            os.system(run_cmd + " -Wno-override-module " + bc_path + " -o " + out)
+            # compile program using optimization pass
+            d = {'module_uoa':'program',
+                 'data_uoa': data_uoa,
+                 'action': 'compile',
+                 'compiler_tags': "llvm",
+                 'use_clang_opt': 'yes',
+                 'flags':pass_list
+                }
+
+            r = ck.access(d)
+            if r['return'] > 0: return r
+
             # time executable
             start = time.time()
-            os.system(ep + out + ext)
+            # run and time 'optimized' program
+            d = {'module_uoa':'program',
+                 'data_uoa': data_uoa,
+                 'action': 'run'
+                }
+
+            r = ck.access(d)
+            if r['return'] > 0: return r
             end = time.time()
             # TODO - read time from file store into var and compute reward as follows
             # read time from file into var
