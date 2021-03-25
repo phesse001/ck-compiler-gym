@@ -162,12 +162,6 @@ def run_dqn(i):
         # append tuple of benchmark and uid 
         benchmarks.append((benchmark,meta['backup_data_uid']))
 
-    # TODO - find out how to make benchmarks (might be able to just load each meta and pass the
-    # source files as args to benchmark, could also try to directly compile to bitcode, or might
-    # have to provide information (ask in gh issue about make_benchmark api if it doesn't work))
-
-    #env.benchmark = env.make_benchmark(program_files)
-    # choose current benchmark randomly for right now
 
     agent = Agent(gamma = 0.99, epsilon = 1.0, batch_size = 32,
             n_actions = env.action_space.n, eps_end = 0.05, input_dims = [56], alpha = 0.005)
@@ -195,31 +189,22 @@ def run_dqn(i):
         avg_total = []
         change_count = 0
 
-        #write current observation to bitcode file
-        #env.write_bitcode(bitcode_path + dir_sep + "out.bc")
-        #compile run and time file bc in original state
-
-
-        # time executable
-        start = time.time()
         d = {'module_uoa':'program',
              'data_uoa': data_uoa,
              'action': 'run'
             }
         r = ck.access(d)
         if r['return'] > 0: return r
-        # read time from file into var
-        end = time.time()
         
-        runtime = end - start
+        runtime = r['characteristics']['execution_time']
 
-        # TODO - find out which transformation was chosen (using lookup table from cg api),
-        # apply that transformation to the programs bitcode file, 
 
-        pass_list = ''
+        # add mem2reg to put IR in SSA form, which is required for most opt passes
+        pass_list = '-mem2reg '
 
         while done == False and actions_taken < 100 and change_count < 10:
             #only apply finite number of actions to given program
+            print(observation)
             action = agent.choose_action(observation)
             trans_pass = actions[action]
             pass_list += trans_pass + ' '
@@ -237,8 +222,6 @@ def run_dqn(i):
             r = ck.access(d)
             if r['return'] > 0: return r
 
-            # time executable
-            start = time.time()
             # run and time 'optimized' program
             d = {'module_uoa':'program',
                  'data_uoa': data_uoa,
@@ -247,11 +230,8 @@ def run_dqn(i):
 
             r = ck.access(d)
             if r['return'] > 0: return r
-            end = time.time()
-            # TODO - read time from file store into var and compute reward as follows
-            # read time from file into var
 
-            nruntime = end - start
+            nruntime = r['characteristics']['execution_time']
             reward = np.log(runtime/nruntime)
             runtime = nruntime
 
