@@ -210,17 +210,19 @@ def run_dqn(i):
             pass_list += trans_pass + ' '
             new_observation, reward, done, info = env.step(action)
             actions_taken += 1
+            #not sure if env.step is applying transformation to program at path ... 
+
             # compile program using optimization pass
             d = {'module_uoa':'program',
                  'data_uoa': data_uoa,
                  'action': 'compile',
                  'compiler_tags': "llvm",
-                 'use_clang_opt': 'yes',
-                 'flags':pass_list
+                 #'use_clang_opt': 'yes'
+                 #'flags':pass_list
                 }
 
-            r = ck.access(d)
-            if r['return'] > 0: return r
+            #r = ck.access(d)
+            #if r['return'] > 0: return r
 
             # run and time 'optimized' program
             d = {'module_uoa':'program',
