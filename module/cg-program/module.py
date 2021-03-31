@@ -178,23 +178,8 @@ def run_dqn(i):
         current_benchmark = benchmark_tuple[0]
         data_uoa = benchmark_tuple[1]
 
-
-        # get path to current benchmark
-        d = {'module_uoa':'program',
-             'action':'load',
-             'data_uoa':data_uoa
-            }
-
-        r = ck.access(d)
-        if r['return'] > 0: return r
-
-        path = r['path']
-        print(path)
-
         #observation is the 56 dimensional static feature vector from autophase
         observation = env.reset(benchmark=current_benchmark)
-        
-        env.write_bitcode(path + "/test.bc")
         
         done = False
         total = 0
@@ -205,54 +190,12 @@ def run_dqn(i):
         avg_total = []
         change_count = 0
 
-        d = {'module_uoa':'program',
-             'data_uoa': data_uoa,
-             'action': 'run'
-            }
-
-        r = ck.access(d)
-        if r['return'] > 0: return r
-        
-        runtime = r['characteristics']['execution_time']
-
-
-        # add mem2reg to put IR in SSA form, which is required for most opt passes
-        pass_list = '-mem2reg '
-
         while done == False and actions_taken < 100 and change_count < 10:
             #only apply finite number of actions to given program
-            print(env.benchmark)
             action = agent.choose_action(observation)
-            trans_pass = actions[action]
-            pass_list += trans_pass + ' '
+
             new_observation, reward, done, info = env.step(action)
             actions_taken += 1
-            #not sure if env.step is applying transformation to program at path ... 
-
-            # compile program using optimization pass
-            d = {'module_uoa':'program',
-                 'data_uoa': data_uoa,
-                 'action': 'compile',
-                 'compiler_tags': "llvm",
-                 #'use_clang_opt': 'yes'
-                 #'flags':pass_list
-                }
-
-            #r = ck.access(d)
-            #if r['return'] > 0: return r
-
-            # run and time 'optimized' program
-            d = {'module_uoa':'program',
-                 'data_uoa': data_uoa,
-                 'action': 'run'
-                }
-
-            r = ck.access(d)
-            if r['return'] > 0: return r
-
-            nruntime = r['characteristics']['execution_time']
-            reward = np.log(runtime/nruntime)
-            runtime = nruntime
 
             total += reward
             if reward == 0:
