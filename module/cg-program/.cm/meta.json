@@ -3,9 +3,6 @@
     "run_dqn": {
       "desc": "compile and run a given program to bitcode"
     },
-    "make_dataset": {
-      "desc": "creates a dataset of c programs to use within llvm compiler gym env"
-    },
     "run": {
       "desc": "run bitcode"
     }

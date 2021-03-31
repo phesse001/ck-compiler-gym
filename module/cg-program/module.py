@@ -62,7 +62,7 @@ def run_dqn(i):
     if r['return']>0: return r
 
     os_dict = r['os_dict']
-    dir_sep = os_dict['dir_sep']
+    #dir_sep = os_dict['dir_sep']
 
     duoa = i['data_uoa']
     muoa = i['module_uoa']
@@ -77,10 +77,10 @@ def run_dqn(i):
     program_path = r['path']
     program_meta = r['dict']
 
-    program_files = program_meta['source_files']
+    #program_files = program_meta['source_files']
 
-    for num in range(len(program_files)):
-        program_files[num] = program_path + dir_sep + program_files[num]
+    #for num in range(len(program_files)):
+        #program_files[num] = program_path + dir_sep + program_files[num]
 
     env_str = program_meta['run_vars']['GYM_ENV']
     # create gym environment
@@ -99,76 +99,11 @@ def run_dqn(i):
 
     # programs is a list of dictionaries containing information about programs matching specified tag
     programs = r['lst']
-    # keep track of programs that don't compile
-    bad_programs = []
 
-    # check to make sure program compilation is successful before running
-    for program in programs:
-
-        program_duoa = program['data_uoa']
-
-        d = {'module_uoa':'program',
-             'action': 'compile',
-             'compiler_tags': "llvm",
-             'data_uoa': program_duoa,
-             'use_clang_opt':'yes'
-            }
-
-        # compile program to bitcode in tmp dir
-        r = ck.access(d)
-        
-        # for some reason return seems to be 0 even when it fails, using other indicator for now
-        # if program compilation fails, remove it from the list of programs to use.
-        if r['misc']['compilation_success'] == 'no':
-
-            bad_programs.append(program)
-
-    # remove bad programs
-    for program in bad_programs:
-        programs.remove(program)
-
-    benchmarks = []
-
-    for program in programs:
-        
-        program_duoa = program['data_uoa']
-
-        d = {'module_uoa':'program',
-             'action': 'load',
-             'data_uoa': program_duoa
-            }
-
-        # loads programs meta desc
-        r = ck.access(d)
-        if r['return']>0: return r
-
-        meta = r['dict']
-        # find path to program entry
-        path = r['path']
-        #files = meta['source_files']
-        # find out whether entry compiles files to tmp directory
-        p_in_tmp = meta['process_in_tmp']
-        if p_in_tmp == 'yes':
-            path = path + dir_sep + 'tmp'
-
-        # list files in the specified directory and return list of all the bitcode files
-        files = [f for f in os.listdir(path) if '.bc' in f]
-
-        for num in range(len(files)):
-            files[num] = path + dir_sep + files[num]
-        # go through and add path to the start of all the files
-        # makes a benchmark with each list of files
-        benchmark = env.make_benchmark(files)
-        # append tuple of benchmark and uid 
-        benchmarks.append((benchmark,meta['backup_data_uid']))
-
+    benchmarks = make_dataset(env,programs,os_dict)
 
     agent = Agent(gamma = 0.99, epsilon = 1.0, batch_size = 32,
             n_actions = env.action_space.n, eps_end = 0.05, input_dims = [56], alpha = 0.005)
-
-    out = "a"
-    ep = os_dict['exec_prefix']
-    ext = os_dict['file_extensions']['exe']
 
     actions = env.action_space.names
 
@@ -268,9 +203,14 @@ def run(i):
 ##############################################################################
 # creates a dataset of c programs to use within llvm compiler gym env
 
-def make_dataset(i):
+def make_dataset(env,programs,os_dict):
     """
     Input:  {
+              env          -the compiler gym environment
+
+              programs     -list of programs to create benchmarks out of
+
+              os_dict      -dictionary from ck containing os info
             }
 
     Output: {
@@ -280,20 +220,67 @@ def make_dataset(i):
             }
 
     """
+    bad_programs = []
 
-    ck.out('creates a dataset of c programs to use within llvm compiler gym env')
+    # check to make sure program compilation is successful before running
+    for program in programs:
 
-    ck.out('')
-    ck.out('Command line: ')
-    ck.out('')
+        program_duoa = program['data_uoa']
 
-    import json
-    cmd=json.dumps(i, indent=2)
+        d = {'module_uoa':'program',
+             'action': 'compile',
+             'compiler_tags': "llvm",
+             'data_uoa': program_duoa,
+             'use_clang_opt':'yes'
+            }
 
-    ck.out(cmd)
+        # compile program to bitcode in tmp dir
+        r = ck.access(d)
+        
+        # for some reason return seems to be 0 even when it fails, using other indicator for now
+        # if program compilation fails, remove it from the list of programs to use.
+        if r['misc']['compilation_success'] == 'no':
 
-    # TODO 
-    # provide repo uoa 
-    # 
+            bad_programs.append(program)
 
-    return {'return':0}
+    # remove bad programs
+    for program in bad_programs:
+        programs.remove(program)
+
+    benchmarks = []
+
+    for program in programs:
+        
+        program_duoa = program['data_uoa']
+
+        d = {'module_uoa':'program',
+             'action': 'load',
+             'data_uoa': program_duoa
+            }
+
+        # loads programs meta desc
+        r = ck.access(d)
+        if r['return']>0: return r
+
+        meta = r['dict']
+        # find path to program entry
+        path = r['path']
+
+        dir_sep = os_dict['dir_sep']
+        # find out whether entry compiles files to tmp directory
+        p_in_tmp = meta['process_in_tmp']
+        if p_in_tmp == 'yes':
+            path = path + dir_sep + 'tmp'
+
+        # list files in the specified directory and return list of all the bitcode files
+        files = [f for f in os.listdir(path) if '.bc' in f]
+
+        for num in range(len(files)):
+            files[num] = path + dir_sep + files[num]
+        # go through and add path to the start of all the files
+        # makes a benchmark with each list of files
+        benchmark = env.make_benchmark(files)
+        # append tuple of benchmark and uid 
+        benchmarks.append((benchmark,meta['backup_data_uid']))
+
+    return benchmarks
