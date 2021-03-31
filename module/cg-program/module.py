@@ -177,9 +177,25 @@ def run_dqn(i):
         benchmark_tuple = random.choice(benchmarks)
         current_benchmark = benchmark_tuple[0]
         data_uoa = benchmark_tuple[1]
+
+
+        # get path to current benchmark
+        d = {'module_uoa':'program',
+             'action':'load',
+             'data_uoa':data_uoa
+            }
+
+        r = ck.access(d)
+        if r['return'] > 0: return r
+
+        path = r['path']
+        print(path)
+
         #observation is the 56 dimensional static feature vector from autophase
         observation = env.reset(benchmark=current_benchmark)
-        #maybe try setting done to true every time code size increases
+        
+        env.write_bitcode(path + "/test.bc")
+        
         done = False
         total = 0
         actions_taken = 0
@@ -193,6 +209,7 @@ def run_dqn(i):
              'data_uoa': data_uoa,
              'action': 'run'
             }
+
         r = ck.access(d)
         if r['return'] > 0: return r
         
@@ -204,7 +221,7 @@ def run_dqn(i):
 
         while done == False and actions_taken < 100 and change_count < 10:
             #only apply finite number of actions to given program
-            print(observation)
+            print(env.benchmark)
             action = agent.choose_action(observation)
             trans_pass = actions[action]
             pass_list += trans_pass + ' '
