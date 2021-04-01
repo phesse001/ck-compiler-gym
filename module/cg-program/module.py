@@ -24,6 +24,7 @@ def init(i):
 
     path = i['path']
 
+    # add location of dqn file to python path so that it can be imported
     sys.path.insert(1, path)
 
     return {'return': 0}
@@ -43,6 +44,7 @@ def run_dqn(i):
             }
 
     """
+    # various imports
 
     import subprocess
     import compiler_gym
@@ -53,20 +55,17 @@ def run_dqn(i):
     import numpy as np
     from dqn import Agent
 
+    duoa = i['data_uoa']
+    muoa = i['module_uoa']
+
     # detect platform for various info
     d = {'module_uoa': 'platform.os',
          'action': 'detect'
         }
     r = ck.access(d)
-
     if r['return']>0: return r
 
     os_dict = r['os_dict']
-    #dir_sep = os_dict['dir_sep']
-
-    duoa = i['data_uoa']
-    muoa = i['module_uoa']
-
     # load the entry's dictionary
     d = {'module_uoa': muoa,
          'data_uoa': duoa
@@ -77,17 +76,11 @@ def run_dqn(i):
     program_path = r['path']
     program_meta = r['dict']
 
-    #program_files = program_meta['source_files']
-
-    #for num in range(len(program_files)):
-        #program_files[num] = program_path + dir_sep + program_files[num]
-
     env_str = program_meta['run_vars']['GYM_ENV']
     # create gym environment
     env = gym.make(env_str)
-    #create benchmark of programs specified with --dataset_tags
-    dataset_tags = i['dataset_tags']
 
+    dataset_tags = i['dataset_tags']
     # search for all program entries with specified tags
     d = {'module_uoa': 'program',
          'action': 'search',
@@ -170,7 +163,14 @@ def run(i):
 
     duoa = i['data_uoa']
     muoa = i['module_uoa']
-    dataset_tags = i['dataset_tags']
+
+    try:
+        dataset_tags = i['dataset_tags']
+        if dataset_tags == '' or dataset_tags == 'yes':
+            return {'return':1, 'error': 'No dataset tags provided'}
+
+    except KeyError as ke:
+        return {'return':1, 'error': "Key not found:" + str(ke)}
 
 	# load the entry's dictionary
     d = {'module_uoa': muoa,
@@ -194,8 +194,10 @@ def run(i):
 		 'tag_groups': tag_grps,
 		 'shell_cmd': 'ck run_dqn ' + muoa + ':' + duoa + ' --dataset_tags=' + dataset_tags
 		}
+    print(d)
 
     r = ck.access(d)
+    print(r)
     if r['return']>0: return r
 
     return {'return':0}

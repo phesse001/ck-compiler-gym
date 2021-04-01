@@ -24,31 +24,17 @@
     "tags": "torch,v1.8"
     }
   },
-  "main_language": "c",
+  "main_language": "python",
   "process_in_tmp": "yes",
   "program": "yes",
-  "run_cmds": {
-    "default": {
-      "ignore_return_code": "no",
-      "run_time": {
-        "run_cmd_main": "clang-10",
-        "time_cmd_main": "time",
-        "run_cmd_out": "hw.bc"
-      }
-    }
-  },
   "run_vars": {
-    "GYM_ENV": "llvm-autophase-ic-v0"
+    "GYM_ENV": "llvm-autophase-codesize-v0"
   },
   "source_files": [
-    "hello-world.c"
   ],
   "tags": [
     "template",
     "program",
-    "lang-c"
-  ],
-  "target_file": "a",
-  "template": "yes",
-  "template_type": "C program workflow"
+    "python"
+  ]
 }
